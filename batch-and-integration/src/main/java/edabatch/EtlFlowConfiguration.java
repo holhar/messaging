@@ -20,44 +20,44 @@ import static org.springframework.integration.file.FileHeaders.ORIGINAL_FILE;
 @Configuration
 class EtlFlowConfiguration {
 
- // <1>
- @Bean
- IntegrationFlow etlFlow(
-  @Value("${input-directory:${HOME}/Desktop/in}") File directory,
-  BatchChannels c, JobLauncher launcher, Job job) {
+    // <1>
+    @Bean
+    IntegrationFlow etlFlow(
+            @Value("${input-directory:${HOME}/Desktop/in}") File directory,
+            BatchChannels c, JobLauncher launcher, Job job) {
 
-  return IntegrationFlows
-   .from(Files.inboundAdapter(directory).autoCreateDirectory(true),
-    cs -> cs.poller(p -> p.fixedRate(1000)))
-   .handle(
-    File.class,
-    (file, headers) -> {
+        return IntegrationFlows
+                .from(Files.inboundAdapter(directory).autoCreateDirectory(true),
+                        cs -> cs.poller(p -> p.fixedRate(1000)))
+                .handle(
+                        File.class,
+                        (file, headers) -> {
 
-     String absolutePath = file.getAbsolutePath();
- 	 	 // <2>
-     JobParameters params = new JobParametersBuilder().addString("file",
-      absolutePath).toJobParameters();
+                            String absolutePath = file.getAbsolutePath();
+                            // <2>
+                            JobParameters params = new JobParametersBuilder().addString("file",
+                                    absolutePath).toJobParameters();
 
-     return MessageBuilder.withPayload(new JobLaunchRequest(job, params))
-      .setHeader(ORIGINAL_FILE, absolutePath)
-      .copyHeadersIfAbsent(headers).build();
-    })
-	 // <3>
-   .handle(new JobLaunchingGateway(launcher))
-	 // <4>
-   .routeToRecipients(
-    spec -> spec.recipient(c.invalid(), this::notFinished).recipient(
-     c.completed(), this::finished)).get();
- }
+                            return MessageBuilder.withPayload(new JobLaunchRequest(job, params))
+                                    .setHeader(ORIGINAL_FILE, absolutePath)
+                                    .copyHeadersIfAbsent(headers).build();
+                        })
+                // <3>
+                .handle(new JobLaunchingGateway(launcher))
+                // <4>
+                .routeToRecipients(
+                        spec -> spec.recipient(c.invalid(), this::notFinished).recipient(
+                                c.completed(), this::finished)).get();
+    }
 
- private boolean finished(Message<?> msg) {
-  Object payload = msg.getPayload();
-  return JobExecution.class.cast(payload).getExitStatus()
-   .equals(ExitStatus.COMPLETED);
- }
+    private boolean finished(Message<?> msg) {
+        Object payload = msg.getPayload();
+        return JobExecution.class.cast(payload).getExitStatus()
+                .equals(ExitStatus.COMPLETED);
+    }
 
- private boolean notFinished(Message<?> msg) {
-  return !this.finished(msg);
- }
+    private boolean notFinished(Message<?> msg) {
+        return !this.finished(msg);
+    }
 
 }
